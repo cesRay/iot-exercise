@@ -3,6 +3,7 @@ infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.*
 infra/terraform.tfvars
+infra/tfplan
 
 # Generados por Terraform: contienen secretos o datos de la cuenta de AWS
 bridge/certs/
@@ -17,3 +18,5 @@ __pycache__/
 
 # Sistema
 .DS_Store
+
+/docs/plans/*
