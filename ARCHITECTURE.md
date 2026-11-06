@@ -26,7 +26,7 @@ Demo de IoT (Internet de las cosas) para una presentación universitaria. Desde 
 
 | Componente | Dónde corre | Responsabilidad |
 |---|---|---|
-| Página web | Laptop (archivo HTML abierto en el navegador, sin servidor) | Botón de encendido, selector de color y control de brillo. Escribe el estado `desired` en la sombra y muestra el estado `reported`. |
+| Página web | Laptop (archivos estáticos servidos en `localhost`) | Botón de encendido, selector de color y control de brillo (10 a 100). Escribe el estado `desired` en la sombra y muestra el estado `reported`. |
 | AWS IoT Core | Nube de AWS | Broker MQTT. Registra el *thing* `foco-aula` y su Device Shadow. |
 | Puente | Raspberry Pi (servicio del sistema) | Recibe los cambios de la sombra, los envía al foco por UDP y reporta el estado real del foco. |
 | Foco WiZ | Red local (hotspot) | Recibe comandos UDP en el puerto 38899. Nunca habla con AWS directamente. |
@@ -114,10 +114,35 @@ Un navegador no puede enviar UDP, y el foco WiZ no puede conectarse a AWS IoT Co
 
 La Pi usa Raspberry Pi OS Lite (sin escritorio) y se administra por SSH. Sin escritorio, la memoria SD lenta de 32 GB es suficiente.
 
-### D5. Página web sin servidor
+### D5. Página web estática servida en `localhost`
 
-La página es un archivo HTML que se abre en el navegador de la laptop. No necesita hosting ni servidor propio. Se conecta a AWS IoT Core por MQTT sobre WebSockets seguros (puerto 443) con credenciales temporales de Cognito.
+La página son archivos estáticos (HTML, CSS y JavaScript) en la carpeta `web/`. Se sirven en la laptop con `python3 -m http.server` y se abren en `http://localhost:8000`. No necesita hosting.
+
+No se abre el archivo directamente (`file://`) porque el navegador solo permite módulos de JavaScript y la API de criptografía (Web Crypto, que firma la conexión) en un origen seguro, y `localhost` lo es.
+
+La página se conecta a AWS IoT Core por MQTT sobre WebSockets seguros (puerto 443) con credenciales temporales de Cognito. No usa el SDK de AWS: pide las credenciales a Cognito con `fetch` y firma la URL con SigV4.
 
 ### D6. Hotspot del celular como red
 
 Ver la sección [Red](#red).
+
+### D7. Infraestructura como código con Terraform
+
+Todos los recursos de AWS (thing, certificado, políticas, grupo de identidades de Cognito, rol de invitado y alerta de presupuesto) se definen con Terraform en `infra/`. Terraform también genera la configuración del puente (`bridge/config.toml` y `bridge/certs/`) y de la página (`web/config.js`).
+
+- El estado de Terraform (`terraform.tfstate`) contiene la llave privada del certificado. Se guarda solo en la laptop y está en `.gitignore`. No se usa un backend remoto: para una demo de una persona, agrega costo y pasos sin beneficio.
+- Al terminar el proyecto, `terraform destroy` borra todos los recursos.
+
+## Manejo de errores
+
+| Situación | Qué hace el sistema | Qué ve la página |
+|---|---|---|
+| La Pi se desconecta | AWS IoT Core publica `offline` en `aula/foco/disponible` (Last Will) | Gateway: "fuera de línea" |
+| El foco no responde | El puente lo busca de nuevo en la red y reintenta una vez. Si falla otra vez, no reporta nada. | A los 5 segundos: "El foco no confirmó el cambio" |
+| La IP del foco cambia | Si `config.toml` no tiene IP fija, el puente busca el foco con un mensaje UDP de difusión (broadcast) | Nada: el cambio es transparente |
+| Un valor inválido en `desired` | El puente descarta ese campo, aplica los válidos y borra el campo inválido del estado deseado | El control vuelve al valor confirmado |
+| La página pierde la conexión | Pide credenciales nuevas a Cognito y reconecta cada 3 segundos | Conexión: "desconectado, reintentando…" |
+| Se pidió un cambio con la Pi apagada | Al reconectar, el puente reporta el estado del foco. AWS IoT Core envía el delta y el puente lo aplica. | El cambio se aplica solo |
+| AWS IoT Core rechaza una actualización | Publica el motivo en `shadow/update/rejected` | El mensaje con el motivo |
+
+El brillo va de 10 a 100 porque los focos WiZ no bajan del 10 %. Con un mínimo de 0, el foco reportaría 10 y la página quedaría esperando una confirmación que nunca llega.
