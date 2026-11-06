@@ -63,6 +63,15 @@ Cada actor tiene permisos mínimos.
 
 La Pi, el foco y la laptop se conectan al hotspot del celular del presentador. Así la demo no depende del WiFi de la universidad, que suele bloquear la comunicación entre dispositivos o pedir inicio de sesión en un portal. El hotspot también da la salida a Internet hacia AWS IoT Core.
 
+No hay cables entre la Pi y el foco. Los dos se conectan por WiFi al hotspot, y el puente envía los comandos UDP al foco por esa red. Cada dispositivo solo necesita su propia alimentación eléctrica.
+
+**Banda de 2.4 GHz obligatoria:** los focos WiZ solo funcionan en la banda de 2.4 GHz. El hotspot debe usar esa banda:
+
+- **iPhone:** activar "Maximizar compatibilidad" en la configuración de Compartir Internet.
+- **Android:** elegir la banda de 2.4 GHz en la configuración del hotspot.
+
+La Raspberry Pi 4 funciona en las bandas de 2.4 GHz y 5 GHz, así que no requiere cambios.
+
 ## Costo
 
 | Concepto | Costo |
@@ -70,7 +79,8 @@ La Pi, el foco y la laptop se conectan al hotspot del celular del presentador. A
 | Foco WiZ A19 multicolor (Amazon México) | Aproximadamente 235 MXN (compra única) |
 | AWS IoT Core | 0 MXN. El uso de la demo (cientos de mensajes) se cubre con los créditos del plan gratuito de AWS. |
 | Amazon Cognito (acceso de invitado) | 0 MXN, dentro de los créditos del plan gratuito |
-| Raspberry Pi 4 y memoria SD | 0 MXN (ya disponibles) |
+| Socket con cable y clavija (portalámparas E26/E27), si no hay una lámpara disponible | Aproximadamente 50 a 100 MXN (compra única) |
+| Raspberry Pi 4, cargador USB-C de 5 V / 3 A y memoria SD | 0 MXN (ya disponibles) |
 
 La cuenta de AWS se creó en 2026-06 con el plan gratuito, que dura 6 meses y vence en 2026-12. Para conservar la cuenta después de esa fecha, hay que cambiarla al plan de pago antes de que venza. Se recomienda configurar una alerta de presupuesto (AWS Budgets) en 1 USD.
 
@@ -82,6 +92,7 @@ WiZ acepta comandos JSON por UDP en la red local (puerto 38899), sin nube, sin c
 
 - **Requisito:** activar "Permitir comunicación local" en la app de WiZ.
 - **Requisito:** el modelo debe ser "multicolor" o "de colores". Los modelos de solo blanco ajustable no sirven.
+- **Requisito:** una red WiFi de 2.4 GHz. Ver la sección [Red](#red).
 - **Descartadas:** Tuya/Smart Life (hay que extraer claves locales), TP-Link Tapo (requiere credenciales de la nube) y Philips Hue (requiere un Hue Bridge, fuera de presupuesto).
 
 ### D2. MQTT con publicación/suscripción en lugar de control directo
