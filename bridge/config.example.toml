@@ -1,0 +1,14 @@
+# Ejemplo. Terraform genera el archivo real (config.toml) con: terraform -chdir=infra apply
+endpoint = "xxxxxxxxxxxxxx-ats.iot.us-east-1.amazonaws.com"
+thing_name = "foco-aula"
+topico_disponible = "aula/foco/disponible"
+
+[certificados]
+cert = "certs/certificate.pem.crt"
+key = "certs/private.pem.key"
+ca = "certs/AmazonRootCA1.pem"
+
+[foco]
+# Vacío: el puente busca el foco en la red. Escribe la IP si la búsqueda falla.
+ip = ""
+broadcast = "172.20.10.15"
