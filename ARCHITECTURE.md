@@ -5,7 +5,7 @@ Demo de IoT (Internet de las cosas) para una presentación universitaria. Desde 
 ## Objetivos y restricciones
 
 - **Costo:** 0 MXN en servicios. La única compra es el foco (presupuesto máximo: 500 MXN).
-- **Hardware disponible:** Raspberry Pi 4 con memoria SD de 16 GB (lenta). Sin componentes electrónicos adicionales.
+- **Hardware disponible:** Raspberry Pi 4 con memoria SD de 32 GB (lenta). Sin componentes electrónicos adicionales.
 - **Sin desarmar productos:** el foco se usa tal como viene de fábrica.
 - **Separación real:** el publicador (laptop) y el sistema físico (Pi + foco) son independientes y solo se comunican por el broker.
 - **Fecha de la presentación:** antes de 2026-12.
@@ -112,7 +112,7 @@ Se eligió AWS IoT Core en lugar de Mosquitto en la Pi o de un broker público.
 
 Un navegador no puede enviar UDP, y el foco WiZ no puede conectarse a AWS IoT Core. Hace falta un puente. Se ejecuta en la Pi y no en la laptop para que el publicador y el sistema físico estén separados de verdad, como en un sistema IoT real.
 
-La Pi usa Raspberry Pi OS Lite (sin escritorio) y se administra por SSH. Sin escritorio, la memoria SD lenta de 16 GB es suficiente.
+La Pi usa Raspberry Pi OS Lite (sin escritorio) y se administra por SSH. Sin escritorio, la memoria SD lenta de 32 GB es suficiente.
 
 ### D5. Página web sin servidor
 
