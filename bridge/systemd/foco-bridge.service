@@ -1,0 +1,14 @@
+[Unit]
+Description=Puente entre AWS IoT Core y el foco WiZ
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+User=cesray
+WorkingDirectory=/home/cesray/foco-bridge
+ExecStart=/home/cesray/foco-bridge/.venv/bin/python -m foco_bridge.main --config /home/cesray/foco-bridge/config.toml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
