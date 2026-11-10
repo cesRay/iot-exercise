@@ -1,0 +1,103 @@
+:root {
+  color-scheme: dark;
+  --fondo: #111418;
+  --texto: #e8eaed;
+  --tenue: #9aa0a6;
+  --acento: #8ab4f8;
+  --error: #f28b82;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--fondo);
+  color: var(--texto);
+  font: 18px/1.5 system-ui, sans-serif;
+}
+
+main {
+  width: min(32rem, 100% - 2rem);
+  display: grid;
+  gap: 1.5rem;
+  justify-items: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.foco {
+  width: 12rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #2a2e33;
+  transition: background-color 0.1s, box-shadow 0.1s, opacity 0.1s;
+}
+
+.mensaje {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--error);
+  text-align: center;
+}
+
+.controles {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+}
+
+.controles label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.75rem 1.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--acento);
+  color: #111;
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input[type="color"] {
+  width: 4rem;
+  height: 2.5rem;
+  border: 0;
+  background: none;
+}
+
+input[type="range"] {
+  flex: 1;
+}
+
+.estado {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  width: 100%;
+  margin: 0;
+  color: var(--tenue);
+}
+
+.estado dd {
+  margin: 0;
+  color: var(--texto);
+}
