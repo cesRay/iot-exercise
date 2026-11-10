@@ -101,6 +101,6 @@ resource "local_file" "bridge_config" {
     [foco]
     # Vacío: el puente busca el foco en la red. Escribe la IP si la búsqueda falla.
     ip = ""
-    broadcast = "172.20.10.15"
+    broadcast = "255.255.255.255"
   EOT
 }

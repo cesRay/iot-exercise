@@ -40,5 +40,5 @@ def test_valores_por_omision(tmp_path: Path):
     )
     config = cargar(ruta)
     assert config.topico_disponible == "aula/foco/disponible"
-    assert config.broadcast == "172.20.10.15"
+    assert config.broadcast == "255.255.255.255"
     assert config.foco_ip is None

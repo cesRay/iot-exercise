@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TOPICO_DISPONIBLE = "aula/foco/disponible"
-BROADCAST_HOTSPOT = "172.20.10.15"
+# Difusión limitada: funciona en cualquier red, en casa o en el hotspot.
+BROADCAST = "255.255.255.255"
 
 
 @dataclass(frozen=True)
@@ -34,5 +35,5 @@ def cargar(ruta: Path) -> Config:
         key=base / certificados["key"],
         ca=base / certificados["ca"],
         foco_ip=foco.get("ip") or None,
-        broadcast=foco.get("broadcast", BROADCAST_HOTSPOT),
+        broadcast=foco.get("broadcast", BROADCAST),
     )
