@@ -9,7 +9,7 @@ from typing import Protocol
 from pywizlight import PilotBuilder, wizlight
 from pywizlight.discovery import discover_lights
 
-from foco_bridge.color import brillo_a_wiz, hex_a_rgb, rgb_a_hex, wiz_a_brillo
+from foco_bridge.color import brillo_a_wiz, color_del_foco, hex_a_rgb, wiz_a_brillo
 from foco_bridge.estado import ESTADO_INICIAL, EstadoFoco
 
 log = logging.getLogger(__name__)
@@ -101,12 +101,15 @@ class FocoWiz:
 
     async def leer(self) -> EstadoFoco:
         luz = await self._luz()
-        estado = await asyncio.wait_for(luz.updateState(), self._tiempo_maximo)
-        rgb = estado.get_rgb()
+        # pywizlight devuelve una lista: un estado por cada parte del foco. Un foco normal tiene una sola.
+        estados = await asyncio.wait_for(luz.updateState(), self._tiempo_maximo)
+        estado = estados[0] if estados else None
+        if estado is None:
+            raise FocoNoEncontrado(f"El foco en {luz.ip} no respondió")
         brillo = estado.get_brightness()
         return EstadoFoco(
             encendido=bool(estado.get_state()),
-            color=rgb_a_hex(rgb) if None not in rgb else ESTADO_INICIAL.color,
+            color=color_del_foco(estado.get_rgb()),
             brillo=wiz_a_brillo(brillo) if brillo is not None else ESTADO_INICIAL.brillo,
         )
 

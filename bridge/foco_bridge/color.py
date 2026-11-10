@@ -17,3 +17,10 @@ def brillo_a_wiz(brillo: int) -> int:
 
 def wiz_a_brillo(valor: int) -> int:
     return min(BRILLO_MAXIMO, max(BRILLO_MINIMO, round(valor * 100 / 255)))
+
+
+def color_del_foco(rgb: tuple[int | None, int | None, int | None]) -> str:
+    """Color que reporta el foco. En modo blanco, el foco usa sus LED blancos y reporta r=g=b=0 (o nada)."""
+    if None in rgb or not any(rgb):
+        return "#ffffff"
+    return rgb_a_hex(rgb)
