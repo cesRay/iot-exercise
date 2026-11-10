@@ -1,7 +1,9 @@
 """Acceso al foco: el foco WiZ real (UDP en la red local) y un foco simulado para desarrollar sin hardware."""
 
 import asyncio
+import ipaddress
 import logging
+import socket
 from typing import Protocol
 
 from pywizlight import PilotBuilder, wizlight
@@ -11,6 +13,9 @@ from foco_bridge.color import brillo_a_wiz, hex_a_rgb, rgb_a_hex, wiz_a_brillo
 from foco_bridge.estado import ESTADO_INICIAL, EstadoFoco
 
 log = logging.getLogger(__name__)
+
+PUERTO_WIZ = 38899
+PREGUNTA_ESTADO = b'{"method":"getPilot","params":{}}'
 
 
 class FocoNoEncontrado(RuntimeError):
@@ -37,13 +42,52 @@ class FocoSimulado:
         self._estado = estado
 
 
+def ip_local() -> str:
+    """IP de la Pi en la red local. `connect` en UDP no envía nada: solo elige la interfaz de salida."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+
+
+def vecinos(ip: str) -> list[str]:
+    """Las otras direcciones de la red /24 de `ip`. Cubre la red de casa y la del hotspot (172.20.10.0/28)."""
+    red = ipaddress.ip_network(f"{ip}/24", strict=False)
+    return [str(host) for host in red.hosts() if str(host) != ip]
+
+
+async def barrer(direcciones: list[str], puerto: int = PUERTO_WIZ, espera: float = 2.0) -> list[str]:
+    """Pregunta su estado a cada dirección y devuelve las que responden como foco WiZ."""
+    respuestas: list[str] = []
+
+    class Receptor(asyncio.DatagramProtocol):
+        def datagram_received(self, datos: bytes, origen: tuple) -> None:
+            if b'"result"' in datos and origen[0] not in respuestas:
+                respuestas.append(origen[0])
+
+    transporte, _ = await asyncio.get_running_loop().create_datagram_endpoint(Receptor, local_addr=("0.0.0.0", 0))
+    try:
+        for direccion in direcciones:
+            transporte.sendto(PREGUNTA_ESTADO, (direccion, puerto))
+        await asyncio.sleep(espera)
+    finally:
+        transporte.close()
+    return respuestas
+
+
 async def descubrir(broadcast: str) -> str:
-    """Busca focos WiZ con un mensaje de difusión (broadcast) y devuelve la IP del primero."""
-    focos = await discover_lights(broadcast_space=broadcast)
+    """Busca un foco WiZ y devuelve su IP.
+
+    Primero usa un mensaje de difusión (broadcast). Algunos módems no dejan pasar esos mensajes,
+    así que si nadie responde, pregunta a cada dirección de la red.
+    """
+    focos = [foco.ip for foco in await discover_lights(broadcast_space=broadcast)]
     if not focos:
-        raise FocoNoEncontrado(f"No respondió ningún foco WiZ en {broadcast}")
-    log.info("Foco WiZ encontrado en %s", focos[0].ip)
-    return focos[0].ip
+        log.info("Ningún foco respondió al broadcast %s. Se pregunta a cada dirección de la red.", broadcast)
+        focos = await barrer(vecinos(ip_local()))
+    if not focos:
+        raise FocoNoEncontrado("No respondió ningún foco WiZ en la red")
+    log.info("Foco WiZ encontrado en %s", focos[0])
+    return focos[0]
 
 
 class FocoWiz:
