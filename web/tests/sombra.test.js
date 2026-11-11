@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { leerDocumentos, leerGetAceptado, payloadDeseado, topicos } from "../js/estado.js";
+import { leerDocumentos, leerGetAceptado, payloadDeseado, topicos } from "../js/sombra/index.js";
 
 test("topicos de la sombra", () => {
   const t = topicos("foco-aula", "aula/foco/disponible");

@@ -1,63 +1,41 @@
-import { CONFIG } from "../config.js";
-import { leerDocumentos, leerGetAceptado, payloadDeseado, topicos } from "./estado.js";
-import { crearConexion } from "./iot.js";
-import { alEnviar, alExpirar, alRecibir, vistaInicial } from "./vista.js";
+// Punto de entrada de la página: une la conexión con AWS IoT Core, la sombra y la vista.
+import { CONFIG } from "../../config.js";
+import { crearConexion, EstadoConexion } from "../iot/index.js";
+import { Disponibilidad, leerDocumentos, leerGetAceptado, payloadDeseado, topicos } from "../sombra/index.js";
+import { alEnviar, alExpirar, alRecibir, vistaInicial } from "../vista/index.js";
+import { ESPERA_CONFIRMACION_MS, MENSAJE_SIN_CONFIRMACION, PAUSA_ENVIO_MS } from "./constants.js";
+import { $, habilitar, mostrarMensaje, pintar } from "./dom.js";
+import { TextoGateway } from "./enums.js";
 
-const ESPERA_CONFIRMACION_MS = 5000;
-// Pausa sin cambios antes de enviar: evita un mensaje por cada píxel que se mueve un control.
-const PAUSA_ENVIO_MS = 150;
 const t = topicos(CONFIG.thingName, CONFIG.topicoDisponible);
-const $ = (id) => document.getElementById(id);
-const controles = [$("encendido"), $("color"), $("brillo")];
 
 let vista = vistaInicial();
 let temporizador = null;
 let retrasoEnvio = null;
 let cambiosPorEnviar = {};
 
-function habilitar(activo) {
-  for (const control of controles) control.disabled = !activo;
-}
-
-function pintar() {
-  $("estado-foco").textContent = vista.enviando ? "aplicando cambio…" : vista.confirmado ? "confirmado" : "sin datos";
-  if (!vista.mostrado) return;
-  const { encendido, color, brillo } = vista.mostrado;
-  const foco = $("foco");
-  foco.style.backgroundColor = encendido ? color : "";
-  foco.style.opacity = encendido ? String(0.4 + (0.6 * brillo) / 100) : "";
-  foco.style.boxShadow = encendido ? `0 0 ${brillo}px ${brillo / 3}px ${color}` : "";
-  $("encendido").textContent = encendido ? "Apagar" : "Encender";
-  $("color").value = color;
-  $("brillo").value = String(brillo);
-  $("brillo-valor").value = String(brillo);
-}
-
 function revertir(mensaje) {
   clearTimeout(temporizador);
   clearTimeout(retrasoEnvio);
   cambiosPorEnviar = {};
   vista = alExpirar(vista);
-  $("mensaje").textContent = mensaje;
-  pintar();
+  mostrarMensaje(mensaje);
+  pintar(vista);
 }
 
 function recibir(resumen) {
   vista = alRecibir(vista, resumen);
   if (!vista.enviando) {
     clearTimeout(temporizador);
-    $("mensaje").textContent = "";
+    mostrarMensaje("");
   }
-  pintar();
+  pintar(vista);
 }
 
 function publicarCambios() {
   conexion.publicar(t.update, payloadDeseado(cambiosPorEnviar));
   cambiosPorEnviar = {};
-  temporizador = setTimeout(
-    () => revertir("El foco no confirmó el cambio. Revisa que la Raspberry Pi y el foco estén encendidos."),
-    ESPERA_CONFIRMACION_MS,
-  );
+  temporizador = setTimeout(() => revertir(MENSAJE_SIN_CONFIRMACION), ESPERA_CONFIRMACION_MS);
 }
 
 // La página muestra el cambio de inmediato y lo envía a AWS IoT Core en segundo plano,
@@ -65,8 +43,8 @@ function publicarCambios() {
 function enviar(cambios) {
   vista = alEnviar(vista, cambios);
   cambiosPorEnviar = { ...cambiosPorEnviar, ...cambios };
-  $("mensaje").textContent = "";
-  pintar();
+  mostrarMensaje("");
+  pintar(vista);
   clearTimeout(temporizador);
   clearTimeout(retrasoEnvio);
   retrasoEnvio = setTimeout(publicarCambios, PAUSA_ENVIO_MS);
@@ -80,10 +58,10 @@ const conexion = crearConexion(CONFIG, {
   },
   alCambiarEstado(texto) {
     $("estado-conexion").textContent = texto;
-    if (texto !== "conectado") habilitar(false);
+    if (texto !== EstadoConexion.CONECTADO) habilitar(false);
   },
   alPulso(milisegundos) {
-    $("estado-conexion").textContent = `conectado (${milisegundos} ms)`;
+    $("estado-conexion").textContent = `${EstadoConexion.CONECTADO} (${milisegundos} ms)`;
   },
   alMensaje(topico, texto) {
     if (topico === t.documentos) {
@@ -91,7 +69,8 @@ const conexion = crearConexion(CONFIG, {
     } else if (topico === t.getAceptado) {
       recibir(leerGetAceptado(texto));
     } else if (topico === t.disponible) {
-      $("estado-gateway").textContent = texto === "online" ? "en línea" : "fuera de línea";
+      $("estado-gateway").textContent =
+        texto === Disponibilidad.EN_LINEA ? TextoGateway.EN_LINEA : TextoGateway.FUERA_DE_LINEA;
     } else if (topico === t.rechazado) {
       revertir(`AWS rechazó el cambio: ${JSON.parse(texto).message}`);
     }

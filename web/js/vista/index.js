@@ -3,16 +3,14 @@
 // - confirmado: lo último que el foco confirmó (reported sin cambios pendientes)
 // - enviando: hay un cambio enviado que el foco todavía no confirma
 
+import { coinciden } from "./utils.js";
+
 export function vistaInicial() {
   return { mostrado: null, confirmado: null, enviando: false };
 }
 
 export function alEnviar(vista, cambios) {
   return { ...vista, mostrado: { ...vista.mostrado, ...cambios }, enviando: true };
-}
-
-function coinciden(a, b) {
-  return Boolean(a && b) && a.encendido === b.encendido && a.color === b.color && a.brillo === b.brillo;
 }
 
 // `resumen` viene de leerDocumentos o leerGetAceptado: { reportado, pendiente }.

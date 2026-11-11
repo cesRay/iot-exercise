@@ -23,6 +23,17 @@ Página web (laptop) ──MQTT/WSS──> AWS IoT Core ──MQTT/TLS──> Ra
 | `web/` | La página web (JavaScript sin frameworks) y sus pruebas |
 | `docs/` | La arquitectura y esta guía |
 
+En `web/js/`, cada módulo es una carpeta (`app`, `iot`, `sombra`, `sigv4`, `cognito`, `vista`). Dentro de cada carpeta, los archivos se separan por tipo de recurso:
+
+| Archivo | Contenido |
+|---|---|
+| `index.js` | La interfaz pública del módulo. Los otros módulos solo importan de este archivo. |
+| `constants.js` | Valores fijos, como tiempos de espera y límites |
+| `enums.js` | Conjuntos cerrados de valores, como los estados de la conexión |
+| `utils.js` | Funciones auxiliares internas del módulo |
+
+Una carpeta solo tiene los archivos que necesita. `app/` también tiene `dom.js`, que lee y escribe los elementos de la página.
+
 ## 1. Requisitos
 
 **Hardware:**

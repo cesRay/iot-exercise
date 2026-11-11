@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claveDeFirma, fechaAmz, urlFirmada } from "../js/sigv4.js";
+import { urlFirmada } from "../js/sigv4/index.js";
+import { claveDeFirma, fechaAmz } from "../js/sigv4/utils.js";
 
 const aHex = (buffer) => Buffer.from(buffer).toString("hex");
 

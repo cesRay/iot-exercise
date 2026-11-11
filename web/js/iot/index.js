@@ -1,10 +1,11 @@
 import mqtt from "https://unpkg.com/mqtt@5.16.1/dist/mqtt.esm.js";
-import { credencialesInvitado } from "./cognito.js";
-import { urlFirmada } from "./sigv4.js";
+import { credencialesInvitado } from "../cognito/index.js";
+import { urlFirmada } from "../sigv4/index.js";
+import { ESPERA_RECONEXION_MS, PULSO_SEGUNDOS, TIEMPO_MAXIMO_CONEXION_MS } from "./constants.js";
+import { EstadoConexion } from "./enums.js";
+import { medirPulso } from "./utils.js";
 
-const ESPERA_RECONEXION_MS = 3000;
-// Pulso (PINGREQ de MQTT) al broker cada 5 segundos. Si no hay respuesta, mqtt.js cierra la conexión.
-const PULSO_SEGUNDOS = 5;
+export { EstadoConexion } from "./enums.js";
 
 // Conecta el navegador a AWS IoT Core por MQTT sobre WebSockets.
 // Si la conexión se cae, pide credenciales nuevas a Cognito y vuelve a conectar.
@@ -16,7 +17,7 @@ export function crearConexion(config, { suscripciones, alConectar, alMensaje, al
   }
 
   async function abrir() {
-    alCambiarEstado("conectando…");
+    alCambiarEstado(EstadoConexion.CONECTANDO);
     try {
       const credenciales = await credencialesInvitado(config.region, config.identityPoolId);
       const url = await urlFirmada({ host: config.endpoint, region: config.region, credenciales });
@@ -25,17 +26,11 @@ export function crearConexion(config, { suscripciones, alConectar, alMensaje, al
         protocolVersion: 4,
         clean: true,
         reconnectPeriod: 0,
-        connectTimeout: 10_000,
+        connectTimeout: TIEMPO_MAXIMO_CONEXION_MS,
         keepalive: PULSO_SEGUNDOS,
       });
       cliente = nuevo;
-      let pulsoEnviado = 0;
-      nuevo.on("packetsend", (paquete) => {
-        if (paquete.cmd === "pingreq") pulsoEnviado = performance.now();
-      });
-      nuevo.on("packetreceive", (paquete) => {
-        if (paquete.cmd === "pingresp") alPulso(Math.round(performance.now() - pulsoEnviado));
-      });
+      medirPulso(nuevo, alPulso);
       nuevo.on("connect", () => {
         nuevo.subscribe(suscripciones, { qos: 1 }, (error) => {
           if (error) {
@@ -43,7 +38,7 @@ export function crearConexion(config, { suscripciones, alConectar, alMensaje, al
             nuevo.end(true);
             return;
           }
-          alCambiarEstado("conectado");
+          alCambiarEstado(EstadoConexion.CONECTADO);
           alConectar();
         });
       });
@@ -53,7 +48,7 @@ export function crearConexion(config, { suscripciones, alConectar, alMensaje, al
         if (cliente !== nuevo) return;
         cliente = null;
         nuevo.end(true);
-        alCambiarEstado("desconectado, reintentando…");
+        alCambiarEstado(EstadoConexion.RECONECTANDO);
         reintentar();
       });
     } catch (error) {

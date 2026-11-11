@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alEnviar, alExpirar, alRecibir, vistaInicial } from "../js/vista.js";
+import { alEnviar, alExpirar, alRecibir, vistaInicial } from "../js/vista/index.js";
 
 const rojo = { encendido: true, color: "#ff0000", brillo: 80 };
 const azul = { encendido: true, color: "#0000ff", brillo: 80 };
