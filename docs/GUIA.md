@@ -1,6 +1,6 @@
 # Guía de desarrollo: foco RGB controlado por Internet
 
-Esta guía explica, paso a paso, cómo construir el proyecto desde cero: la infraestructura en AWS, la página web, el puente en la Raspberry Pi y el foco WiZ. Las razones de cada decisión están en [ARCHITECTURE.md](ARCHITECTURE.md).
+Esta guía explica, paso a paso, cómo construir el proyecto desde cero: la infraestructura en AWS, la página web, el puente en la Raspberry Pi y el foco WiZ. Las razones de cada decisión están en [ARQUITECTURA.md](ARQUITECTURA.md).
 
 ## Qué vas a construir
 
