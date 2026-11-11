@@ -5,7 +5,7 @@ Demo de IoT (Internet de las cosas) para una presentación universitaria. Desde 
 ## Objetivos y restricciones
 
 - **Costo:** 0 MXN en servicios. La única compra es el foco (presupuesto máximo: 500 MXN).
-- **Hardware disponible:** Raspberry Pi 4 con memoria SD de 32 GB (lenta). Sin componentes electrónicos adicionales.
+- **Hardware disponible:** Raspberry Pi 4 con una memoria SD SanDisk Ultra A1 de 128 GB. Sin componentes electrónicos adicionales.
 - **Sin desarmar productos:** el foco se usa tal como viene de fábrica.
 - **Separación real:** el publicador (laptop) y el sistema físico (Pi + foco) son independientes y solo se comunican por el broker.
 - **Fecha de la presentación:** antes de 2026-12.
@@ -26,26 +26,26 @@ Demo de IoT (Internet de las cosas) para una presentación universitaria. Desde 
 
 | Componente | Dónde corre | Responsabilidad |
 |---|---|---|
-| Página web | Laptop (archivos estáticos servidos en `localhost`) | Botón de encendido, selector de color y control de brillo (10 a 100). Escribe el estado `desired` en la sombra y muestra el estado `reported`. |
+| Página web | Laptop (archivos estáticos servidos en `localhost`) | Botón de encendido, selector de color y control de brillo (10 a 100). Escribe el estado `desired` en la sombra, muestra cada cambio de inmediato y espera la confirmación en el estado `reported`. |
 | AWS IoT Core | Nube de AWS | Broker MQTT. Registra el *thing* `foco-aula` y su Device Shadow. |
 | Puente | Raspberry Pi (servicio del sistema) | Recibe los cambios de la sombra, los envía al foco por UDP y reporta el estado real del foco. |
 | Foco WiZ | Red local (hotspot) | Recibe comandos UDP en el puerto 38899. Nunca habla con AWS directamente. |
 
 ## Flujo de datos (Device Shadow)
 
-La sombra separa lo que se pide (`desired`) de lo que el foco confirma (`reported`). La página nunca asume que el foco cambió: espera la confirmación.
+La sombra separa lo que se pide (`desired`) de lo que el foco confirma (`reported`). La página muestra el cambio de inmediato, pero lo marca como "aplicando cambio…" hasta que el foco lo confirma. Ver [D8](#d8-actualización-optimista-en-la-página).
 
 | Paso | Quién | Qué pasa |
 |---|---|---|
-| 1 | Página | Publica `{"state":{"desired":{"encendido":true,"color":"#ff6600","brillo":80}}}` en `$aws/things/foco-aula/shadow/update` |
+| 1 | Página | Muestra el cambio y, 150 ms después de que el control deja de moverse, publica `{"state":{"desired":{"encendido":true,"color":"#ff6600","brillo":80}}}` en `$aws/things/foco-aula/shadow/update` |
 | 2 | AWS IoT Core | Compara `desired` con `reported` y publica la diferencia en `$aws/things/foco-aula/shadow/update/delta` |
 | 3 | Puente | Recibe el `delta` y envía el comando UDP al foco |
 | 4 | Puente | Lee el estado real del foco y publica `reported` en `$aws/things/foco-aula/shadow/update` |
-| 5 | Página | Recibe `$aws/things/foco-aula/shadow/update/documents` y actualiza la interfaz con el estado confirmado |
+| 5 | Página | Recibe `$aws/things/foco-aula/shadow/update/documents`. Cuando el estado reportado coincide con lo que muestra, cambia "aplicando cambio…" por "confirmado". |
 
 **Disponibilidad:** el puente registra un "último testamento" (*Last Will*) en el tema `aula/foco/disponible`. Si la Pi se desconecta, AWS IoT Core publica `offline` y la página lo muestra.
 
-**Reconexión:** si la Pi está desconectada y alguien cambia el estado, AWS IoT Core guarda el `desired`. Cuando la Pi se vuelve a conectar, recibe el `delta` y el foco se actualiza solo.
+**Reconexión:** si la Pi está desconectada y alguien cambia el estado, AWS IoT Core guarda el `desired`. Cuando la Pi se vuelve a conectar, recibe el `delta` y el foco se actualiza solo. Esto solo funciona si la página está conectada: sin conexión, la página desactiva los controles y no guarda cambios para después.
 
 ## Seguridad
 
@@ -72,6 +72,12 @@ No hay cables entre la Pi y el foco. Los dos se conectan por WiFi al hotspot, y 
 
 La Raspberry Pi 4 funciona en las bandas de 2.4 GHz y 5 GHz, así que no requiere cambios.
 
+**Varias redes en la Pi:** la Pi guarda varias redes Wi-Fi con NetworkManager y se conecta a la que encuentre disponible. La configuración se hace en una red de casa, y el hotspot queda guardado como segunda red para el día de la clase. El foco, en cambio, guarda una sola red: hay que cambiarlo de red con la app de WiZ.
+
+**Ahorro de energía del Wi-Fi:** en la Pi está desactivado (`802-11-wireless.powersave 2` en cada conexión). Con el ahorro activado, la Pi deja de responder por momentos y las sesiones SSH se traban o se cortan.
+
+**El hotspot depende de la señal celular:** si el iPhone pierde los datos, deja de anunciar la red. Antes de la clase hay que revisar la señal en el aula.
+
 ## Costo
 
 | Concepto | Costo |
@@ -90,7 +96,7 @@ La cuenta de AWS se creó en 2026-06 con el plan gratuito, que dura 6 meses y ve
 
 WiZ acepta comandos JSON por UDP en la red local (puerto 38899), sin nube, sin claves y sin cuenta de desarrollador. La librería de Python `pywizlight` ya implementa el protocolo.
 
-- **Requisito:** activar "Permitir comunicación local" en la app de WiZ.
+- **Requisito:** en la app WiZ Connected, en Settings > Security, activar "Allow local" y seleccionar "Allow all controls". Con "Only verified controls", el foco solo acepta mensajes cifrados con una llave de la app y rechaza los de `pywizlight`.
 - **Requisito:** el modelo debe ser "multicolor" o "de colores". Los modelos de solo blanco ajustable no sirven.
 - **Requisito:** una red WiFi de 2.4 GHz. Ver la sección [Red](#red).
 - **Descartadas:** Tuya/Smart Life (hay que extraer claves locales), TP-Link Tapo (requiere credenciales de la nube) y Philips Hue (requiere un Hue Bridge, fuera de presupuesto).
@@ -112,15 +118,19 @@ Se eligió AWS IoT Core en lugar de Mosquitto en la Pi o de un broker público.
 
 Un navegador no puede enviar UDP, y el foco WiZ no puede conectarse a AWS IoT Core. Hace falta un puente. Se ejecuta en la Pi y no en la laptop para que el publicador y el sistema físico estén separados de verdad, como en un sistema IoT real.
 
-La Pi usa Raspberry Pi OS Lite (sin escritorio) y se administra por SSH. Sin escritorio, la memoria SD lenta de 32 GB es suficiente.
+La Pi usa Raspberry Pi OS Lite de 64 bits (sin escritorio) y se administra por SSH. El puente corre como servicio de systemd: arranca con la Pi y se reinicia si falla. El código se copia desde la laptop con `rsync` y se instala en modo editable (`pip install -e .`).
 
 ### D5. Página web estática servida en `localhost`
 
-La página son archivos estáticos (HTML, CSS y JavaScript) en la carpeta `web/`. Se sirven en la laptop con `python3 -m http.server` y se abren en `http://localhost:8000`. No necesita hosting.
+La página son archivos estáticos (HTML, CSS y JavaScript) en la carpeta `web/`. Se sirven en la laptop con `npm start`, que ejecuta `servir.py`, y se abren en `http://localhost:8000`. No necesita hosting.
+
+`servir.py` es el servidor de Python (`http.server`) con el encabezado `Cache-Control: no-store`. Sin ese encabezado, el navegador seguía usando versiones viejas de los módulos de JavaScript después de cada cambio.
 
 No se abre el archivo directamente (`file://`) porque el navegador solo permite módulos de JavaScript y la API de criptografía (Web Crypto, que firma la conexión) en un origen seguro, y `localhost` lo es.
 
 La página se conecta a AWS IoT Core por MQTT sobre WebSockets seguros (puerto 443) con credenciales temporales de Cognito. No usa el SDK de AWS: pide las credenciales a Cognito con `fetch` y firma la URL con SigV4.
+
+El JavaScript no usa frameworks. Cada módulo de `web/js/` es una carpeta (`app`, `iot`, `sombra`, `sigv4`, `cognito`, `vista`) con un `index.js` público y archivos separados por recurso: `constants.js`, `enums.js` y `utils.js`. La convención está en la [guía de desarrollo](GUIA.md).
 
 ### D6. Hotspot del celular como red
 
@@ -133,16 +143,37 @@ Todos los recursos de AWS (thing, certificado, políticas, grupo de identidades 
 - El estado de Terraform (`terraform.tfstate`) contiene la llave privada del certificado. Se guarda solo en la laptop y está en `.gitignore`. No se usa un backend remoto: para una demo de una persona, agrega costo y pasos sin beneficio.
 - Al terminar el proyecto, `terraform destroy` borra todos los recursos.
 
+### D8. Actualización optimista en la página
+
+La primera versión de la página esperaba la confirmación del foco para mostrar un cambio. Con esa versión, el control regresaba por un momento al valor anterior mientras llegaba la confirmación. Ahora la página confía en lo que eligió el usuario:
+
+- **Cambio inmediato:** el círculo y los controles muestran el cambio al momento, también mientras el usuario arrastra el selector de color o el brillo.
+- **Envío con pausa (debounce):** la página publica en la sombra 150 ms después de que el control deja de moverse. Así no envía un mensaje por cada píxel.
+- **Estado de carga:** mientras el foco no confirma, la página muestra "aplicando cambio…". Una confirmación de un cambio anterior no regresa la vista: solo termina la espera la confirmación de lo que se muestra.
+- **Regreso:** si no hay confirmación en 5 segundos, o AWS rechaza el cambio, la página regresa al último estado confirmado y muestra el motivo.
+- **Pulso de conexión:** la conexión MQTT envía un pulso (PINGREQ) cada 5 segundos. La página muestra la latencia ("conectado (NN ms)"). Si el broker no responde, mqtt.js cierra la conexión y la página reconecta.
+
+La lógica de la vista (`web/js/vista/`) es una función pura con pruebas, separada del DOM.
+
+### D9. Búsqueda del foco en la red
+
+El puente no usa una IP fija para el foco, porque la IP cambia entre la red de casa y el hotspot. Busca el foco en dos pasos:
+
+1. Envía un mensaje de difusión (broadcast) a `255.255.255.255`. Esta dirección funciona en cualquier red.
+2. Si nadie responde, le pregunta su estado (`getPilot`) a cada dirección de la red /24 de la Pi. Muchos módems caseros no reenvían el broadcast entre equipos Wi-Fi, pero sí los mensajes dirigidos a una IP. El barrido tarda unos 2 segundos.
+
+Si la búsqueda falla, se puede escribir la IP del foco en `config.toml`.
+
 ## Manejo de errores
 
 | Situación | Qué hace el sistema | Qué ve la página |
 |---|---|---|
 | La Pi se desconecta | AWS IoT Core publica `offline` en `aula/foco/disponible` (Last Will) | Gateway: "fuera de línea" |
-| El foco no responde | El puente lo busca de nuevo en la red y reintenta una vez. Si falla otra vez, no reporta nada. | A los 5 segundos: "El foco no confirmó el cambio" |
-| La IP del foco cambia | Si `config.toml` no tiene IP fija, el puente busca el foco con un mensaje UDP de difusión (broadcast) | Nada: el cambio es transparente |
+| El foco no responde | El puente lo busca de nuevo en la red y reintenta una vez. Si falla otra vez, no reporta nada. | "aplicando cambio…". A los 5 segundos, regresa al último estado confirmado y muestra "El foco no confirmó el cambio". |
+| La IP del foco cambia | Si `config.toml` no tiene IP fija, el puente busca el foco otra vez: primero con broadcast y después dirección por dirección ([D9](#d9-búsqueda-del-foco-en-la-red)) | Nada: el cambio es transparente |
 | Un valor inválido en `desired` | El puente descarta ese campo, aplica los válidos y borra el campo inválido del estado deseado | El control vuelve al valor confirmado |
-| La página pierde la conexión | Pide credenciales nuevas a Cognito y reconecta cada 3 segundos | Conexión: "desconectado, reintentando…" |
-| Se pidió un cambio con la Pi apagada | Al reconectar, el puente reporta el estado del foco. AWS IoT Core envía el delta y el puente lo aplica. | El cambio se aplica solo |
-| AWS IoT Core rechaza una actualización | Publica el motivo en `shadow/update/rejected` | El mensaje con el motivo |
+| La página pierde la conexión | El pulso de 5 segundos detecta la caída. La página pide credenciales nuevas a Cognito y reconecta cada 3 segundos. | Conexión: "desconectado, reintentando…". Los controles se desactivan. |
+| Se pidió un cambio con la Pi apagada | AWS IoT Core guarda el `desired`. Al reconectar, el puente reporta el estado del foco, recibe el delta y lo aplica. | A los 5 segundos, regresa al último estado confirmado. Cuando la Pi vuelve, muestra el cambio aplicado. |
+| AWS IoT Core rechaza una actualización | Publica el motivo en `shadow/update/rejected` | Regresa al último estado confirmado y muestra el motivo |
 
 El brillo va de 10 a 100 porque los focos WiZ no bajan del 10 %. Con un mínimo de 0, el foco reportaría 10 y la página quedaría esperando una confirmación que nunca llega.
